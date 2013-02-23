@@ -8,7 +8,7 @@ Assumption:
 2. MidPeer knowledge: every new peer can talk to the middle peer, no matter whether the middle peer is behind a NAT device.
 
 The demo program has the following components:
-1. midPeer.py: with a public IP addr. (stage 1) or behind a NAT device (stage 2);
-2. iniPeer.py: the initial peer within the pool;
+1. midPeer.py: with a public IP addr. (stage 1) or behind a NAT device (stage 2);/n
+2. iniPeer.py: the initial peer within the pool;/n
 3. newPeer.py: the new peer who wants to join the pool with the help of midPeer.py; each existing peer in the pool will follow Peer Exchange procedure, and talk to the new peer; communication within the pool is full-mesh;
 4. config.py: configuration parameters for this demo program
