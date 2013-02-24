@@ -21,3 +21,14 @@ peer.start()
 1. connect(midPeer_addr): connects to the midPeer;
 2. get(): get the target peer's address from the midPeer;
 3. touch(): send a packet to the target peer reliably;
+
+--------KeepAlive Message--------
+This sub-program is used to measure the NAT mapping duration.
+
+keepAliveDaemon.py: run on a public server;
+keepAliveClient.py: run on a host behind NAT device; interact with Daemon using two sockets.
+
+The procedure is as follows:
+1. client.signal(): the client signals Daemon using 39950;
+2. client.touch(): the client sends a packet to Daemon:39951; it punches a hole for Daemon using client:39951; 
+3. daemon.keepAlive(): the Daemon sends a packet to the client after a specific time, to probe the longest mapping duraiton. 
