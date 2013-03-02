@@ -1,6 +1,6 @@
-#from rudp import *
-#from rudpException import *
+from config import *
 from socket import *
+from json import dumps,loads
 
 class midPeer():
 	def __init__(self):
@@ -10,14 +10,14 @@ class midPeer():
 		self.list = []
 
 	def wait(self):
-		# wait for the connection request from peerlist
-		# blocking
-		recvPkt, addr = self.skt.recvfrom(100)
+		addr = self.skt.recvfrom(100)[1]
 		return addr
 
 	def introduce(self, peerA_addr, peerB_addr):
-		self.skt.sendto(str(peerA_addr), peerB_addr)
-		self.skt.sendto(str(peerB_addr), peerA_addr)
+		msg_to_B = (TYPE_ADDREX, peerA_addr)
+		self.skt.sendto(dumps(msg_to_B), peerB_addr)
+		msg_to_A = (TYPE_ADDREX, peerB_addr)
+		self.skt.sendto(dumps(msg_to_A), peerA_addr)
 
 	def start(self):
 		print 'midPeer is up; waiting for connection requests'
@@ -37,3 +37,6 @@ class midPeer():
 			print 'Error: no enough peers'
 
 		print 'midPeer has done its job'
+
+m = midPeer()
+m.start()

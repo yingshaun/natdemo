@@ -1,0 +1,7 @@
+Peer Exchange Demo Program
+
+Assumption: Endpoint Independent Mapping
+------------------------------
+	A				B
+CUHK Hostel		CUHK Hostel
+CUHK Hostel		IE Wired LAN
