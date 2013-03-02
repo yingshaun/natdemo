@@ -1,7 +1,16 @@
 Peer Exchange Demo Program
 
 Assumption: Endpoint Independent Mapping
-------------------------------
-	A				B
-CUHK Hostel		CUHK Hostel
-CUHK Hostel		IE Wired LAN
+-------------------------------------------
+	A				B			   Status
+CUHK Hostel		CUHK Hostel			 OK
+CUHK Hostel		IE Wired LAN		 OK
+CUHK Wi-Fi		CUHK Wi-Fi			 OK
+CUHK Wi-Fi		IE Wired LAN		 OK
+PCCW Wi-Fi		PCCW Wi-Fi 			 OK
+PCCW Wi-Fi		IE Wired LAN		 OK
+eduroam			eduroam				 OK
+eduroam			IE Wired LAN		 OK
+Univ. Wi-Fi 	Univ. Wi-Fi			 OK
+Univ. Wi-Fi 	IE Wired LAN		 OK
+IE Wired LAN	IE Wired LAN		Fail

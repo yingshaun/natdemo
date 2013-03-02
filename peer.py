@@ -3,6 +3,7 @@ from config import *
 from json import dumps,loads
 from sys import argv
 from time import sleep
+from random import randint
 
 class peer():
 	def __init__(self, port):
@@ -29,6 +30,7 @@ class peer():
 			print 'unexpected messages received'
 
 	def touch(self, target_addr):
+		sleep(1) # make sure the hole has been punched
 		msg = (TYPE_PUNCHHOLE, 'hole-punching msg')
 		self.skt.sendto(dumps(msg), target_addr)
 		print 'peer punching a hole for', target_addr
@@ -58,5 +60,11 @@ class peer():
 		self.touch(target_addr)
 		self.sendData(target_addr)
 
-a = peer(int(argv[1]))
-a.start()
+if len(argv) == 2:
+	a = peer(int(argv[1]))
+	a.start()
+else:
+	# choose a random port number
+	a = peer(39000 + randint(1,100))
+	a.start()
+
