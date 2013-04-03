@@ -60,73 +60,95 @@ class pxService():
 				self.rxDict[node_addr] = True
 		else:
 			for i in range(len(node_list)):
-				#self.aa = node_list
 				node_list[i] = (node_list[i][0].encode(), node_list[i][1])
 				if self.rxDict.get(node_list[i]) == None:
 					self.rxDict[node_list[i]] = True
 
+	def sendKeepAliveMsg(self):
+		if len(self.rxDict): # There exists a node in the list
+				nodeList = self.rxDict.keys()
+				for i in range(len(nodeList)):
+					keepAliveMsg = (str(MSG_PX_KEEPALIVE), None)
+					self.skt.sendto(dumps(keepAliveMsg), nodeList[i], True)
+
 	def keepAliveLoop(self):
 		while True:
-			try:
-				if len(self.rxDict): # There exists a node in the list
-					nodeList = self.rxDict.keys()
-					for i in range(len(nodeList)):
-						keepAliveMsg = (str(MSG_PX_KEEPALIVE), None)
-						self.skt.sendto(dumps(keepAliveMsg), nodeList[i], True)
-						if DEBUG: print 'Send Keep-Alive-Msg to', nodeList[i]
-				elif DEBUG: print 'No nodes in the list'
-			except MAX_RESND_FAIL: pass
+			if DEBUG: print 'Keeping alive with', len(self.getNodes()),'nodes'
+			self.sendKeepAliveMsg()
 			sleep(5)
 
 	def recvLoop(self):
 		while True:
+			# Check the self.skt.failed list
+			if len(self.skt.failed):
+				print ''
+			# Check whether incoming packet in self.skt
 			try:
-				data, addr = self.skt.recvfrom(100)
+				data, addr = self.skt.recvfrom(False)
 				if not data:
 					sleep(0)
 					continue
 				msg = loads(data)
-				if DEBUG: print 'Received msg:', msg, 'from', addr
+				#if DEBUG: print 'Received msg:', msg, 'from', addr
 				if int(msg[0].encode()) == MSG_PX_CONNECT:
 					# Third Party receives a request from a new node
-					if DEBUG: print 'CONNECT message from', addr
+					if DEBUG: print '[Third Party]: a new node arrives at', addr
 					self.notify(addr, self.getNodes())
 					self.addNodes(addr, False)
 				elif int(msg[0].encode()) == MSG_PX_REPLY:
 					# The new node has received acknowledgement from Third Party
-					if DEBUG: print 'REPLY message from', addr
+					if DEBUG: print '[New Node]: getting the list from Third Party @', addr
 					self.addNodes(addr, False)
+					if DEBUG: print '[New Node]: adding', len(msg[1]), 'existing nodes to my list'
 					self.addNodes(msg[1])
+					self.sendKeepAliveMsg()
 				elif int(msg[0].encode()) == MSG_PX_ARRIVAL:
 					# New node joins
-					if DEBUG: 
-						print 'ARRIVAL message from', addr
-						print 'New node joins at', msg[1][0].encode()
+					if DEBUG: print '[Old Node]: adding new node ', (msg[1][0].encode(), msg[1][1]), 'to my list'
 					self.addNodes(msg[1], False)
+					self.sendKeepAliveMsg()
 				sleep(0)
 			except NO_RECV_DATA: 
-				pass
-			except MAX_RESND_FAIL: 
-				if DEBUG: print 'recvLoop MAX_RESND_FAIL'
 				pass
 			sleep(0)
 			continue
 
+	def connect(self, thirdParty_addr, buddy_id = None):
+		self.requestPX(thirdParty_addr, buddy_id)
+		print 'Connecting'
+		init_list_len = len(self.getNodes())
+		init_time = time()
+		while True:
+			new_list_len = len(self.getNodes())
+			if new_list_len > init_list_len:
+				print 'Connected'
+				return True
+			elif (time() - init_time) > 10:
+				print 'Time expired; request failed'
+				return False
+			else: sleep(0)
+
 	def requestPX(self, thirdParty_addr, buddy_id = None):
 		msg = (str(MSG_PX_CONNECT), buddy_id)
 		self.skt.sendto(dumps(msg), thirdParty_addr, True)
-		if DEBUG: print 'Send a CONNECT msg to', thirdParty_addr
+		if DEBUG: print '[New Node]: connecting to Third Party', thirdParty_addr
 
 	def notify(self, new_node, existing_node_list):
 		# Inform the requesting node of the list of existing nodes
 		msg = (str(MSG_PX_REPLY), existing_node_list)
 		self.skt.sendto(dumps(msg), new_node, True)
-		if DEBUG: print 'notify the new node @', new_node
+		# Make sure the list does not include the new node
+		try: existing_node_list.pop(existing_node_list.index(new_node))
+		except ValueError: pass
+		if DEBUG: 
+			print '[Third Party]: telling the new node', new_node
+			print '[Third Party]: my existing list is', existing_node_list
 		# Inform the existing nodes of the new node
-		if DEBUG: print existing_node_list
-		if len(existing_node_list):
-			for i in range(len(existing_node_list)):
-				msg = (str(MSG_PX_ARRIVAL), new_node)
-				self.skt.sendto(dumps(msg), existing_node_list[i], True)
-				if DEBUG: print 'notify existing node @', existing_node_list[i]
+		if not len(existing_node_list): pass
+		if DEBUG: 
+			print '[Third Party]: telling', len(existing_node_list), 'existing nodes'
+			print '[Third Party]: the new node is', new_node
+		for i in range(len(existing_node_list)):
+			msg = (str(MSG_PX_ARRIVAL), new_node)
+			self.skt.sendto(dumps(msg), existing_node_list[i], True)
 		sleep(0)
