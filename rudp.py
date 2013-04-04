@@ -43,7 +43,7 @@ from collections import OrderedDict as oDict
 #-------------------#
 MAX_DATA  = 10244
 MAX_RESND = 3
-RTO       = 1 		#The retransmission time period
+RTO       = 3 		#The retransmission time period
 SDR_PORT  = 50007
 RCV_PORT  = 50008	# 50000-50010
 MAX_PKTID = 0xffffff
@@ -74,7 +74,7 @@ def decode(bitStr):
 		raise DECODE_DATA_FAIL()
 	else:
 		header  = unpack('i', bitStr[:4])[0]
-		return rudpPacket(header & 0x70000000, header & 0x00ffffff, header & REL, bitStr[4:])
+		return rudpPacket(header & 0x7e000000, header & 0x00ffffff, header & REL, bitStr[4:])
 
 #-------------------#
 # DataStructure     #
@@ -122,7 +122,7 @@ class ListDict():
 #-------------------#
 # RUDP Socket       #
 #-------------------#
-class rudpSocket():
+class rudpSocket(object):
 	def __init__(self, srcPort):
 	#UDP socket
 		self.skt  = socket(AF_INET, SOCK_DGRAM) #UDP
@@ -146,6 +146,7 @@ class rudpSocket():
 	def recvLoop(self):
 		while True:
 			data, addr = self.skt.recvfrom(MAX_DATA)
+			print data, addr
 			recvPkt = decode(data)
 		#type
 			if recvPkt['type'] == DAT: self.proDAT(recvPkt, addr)
