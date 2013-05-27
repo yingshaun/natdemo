@@ -2,6 +2,7 @@
 
 from rudp import *
 from rudpException import *
+from ip import *
 from sys import argv
 from json import dumps,loads
 import curses
@@ -33,6 +34,10 @@ class natService(object):
 		self.keepAliveMsgToSnd = oDict()
 		self.targetMidPeer = None
 		self.stat = natStat()
+		ip = IP.Instance()
+		self.myip = ip.myip
+		self.myip2 = ip.myip2
+		self.port = rudpNATSkt.skt.getsockname()[1]
 
 	def start(self, midPeerFlag):
 		self.midPeerFlag = midPeerFlag
@@ -68,7 +73,7 @@ class natService(object):
 					self.rudpNATSkt.sendNATMsgto(dumps(touchMsg), addr)
 					count = self.touchMsgToSnd[addr][1] + 1
 					self.touchMsgToSnd.pop(addr)
-					if count < 5:	# send out 5 touchMsg to compensate for the unreliability of UDP
+					if count < 3:	# send out 5 touchMsg to compensate for the unreliability of UDP
 						self.touchMsgToSnd[addr] = (curTime + TOUCH_MSG_INT, count)
 				else:
 					timeToWait = self.touchMsgToSnd[addr][0] - curTime
@@ -102,8 +107,8 @@ class natService(object):
 		if debug: print natMsg[1]
 		for rawAddr in natMsg[1]:
 			buddyAddr = (rawAddr[0].encode(), rawAddr[1])
-			#self.touch(buddyAddr)
-			self.buddyDict[buddyAddr] = False	# not verified
+			#if buddyAddr[0]!=self.myip and buddyAddr[1]!=self.port:
+			self.buddyDict[buddyAddr] = False# not verified
 			self.touchMsgToSnd[buddyAddr] = (time() + TOUCH_MSG_INT, 0)
 	
 	def processNotifyMsg(self, natMsg, addr):
@@ -121,7 +126,7 @@ class natService(object):
 
 	def request(self, midPeerAddr, buddyID = None):
 		self.targetMidPeer = midPeerAddr
-		msg = (NAT_CODE_REQUEST, buddyID)
+		msg = (NAT_CODE_REQUEST, buddyID, (self.myip2, self.port))
 		self.rudpNATSkt.sendNATMsgto(dumps(msg), midPeerAddr)
 	#	if debug: print '[New Peer]: connecting to the middle peer {0}'.format(midPeerAddr)
 
@@ -176,6 +181,7 @@ class rudpNATSocket(rudpSocket):
 			self.keepAliveMsgToSnd[addr] = (curTime + KEEP_ALIVE_MSG_INT, count)
 
 	def proNAT(self, recvPkt, addr):
+	#	print recvPkt, addr
 		self.natServiceDict[recvPkt['id']].process(recvPkt['data'], addr)
 
 	def sendNATMsgto(self, natMsg, destAddr, asid = 0):
@@ -185,6 +191,7 @@ def pbar(window, nat):
 	while True:
 		if nat.midPeerFlag: window.addstr(2, 5, 'Peer Role: Middle Peer/Sender')
 		else: window.addstr(2, 5, 'Peer Role: Ordinary Peer/Receiver')
+		window.addstr(3, 5, 'Public IP: {0}, Private IP: {1}, Port: {2}'.format(nat.myip, nat.myip2, nat.port))
 		buddyList = nat.buddyDict.keys()
 		window.addstr(5, 5, 'Buddy Count: {0}'.format(len(buddyList)))
 		for i in range(min( 5, len(buddyList))):

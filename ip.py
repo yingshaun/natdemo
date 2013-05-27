@@ -20,6 +20,14 @@ class IP(object):
 				raise Exception("Failed to get self ip!")
 		return self._myip
 
+	@property
+	def myip2(self):
+		if self._privateip == '':
+			self._privateip = self.getPrivateIP()
+			if self._privateip == '':
+				raise Exception("Failed to get self ip!")
+		return self._privateip
+
 	def getCurrentIP(self):
 #		return '192.168.84.206'
 		try:
