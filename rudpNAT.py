@@ -10,33 +10,31 @@ mid = ('54.248.144.148', 39951)
 debug = False
 
 NAT = 0x02000000
-PX_CODE_REQUEST = '1'
-PX_CODE_REPLY = '11'
-PX_CODE_NOTIFY = '2'
-PX_CODE_TOUCH = '3'
-PX_CODE_KEEP_ALIVE = '4'
+NAT_CODE_REQUEST = '1'
+NAT_CODE_REPLY = '11'
+NAT_CODE_NOTIFY = '2'
+NAT_CODE_TOUCH = '3'
+NAT_CODE_KEEP_ALIVE = '4'
 
 TOUCH_MSG_INT = 1	# second
 KEEP_ALIVE_MSG_INT = 3	# seconds
 
-class pxStat(object):
+class natStat(object):
 	def __init__(self):
 		self.lastKeepAliveMsgRcv = dict()
 
 
-class PXService(object):
-	def __init__(self, rudpNATSkt, pxID = None):
+class natService(object):
+	def __init__(self, rudpNATSkt, asid = None):
 		self.buddyDict = dict()
-		self.pxID = pxID 	# pxID is unique for a PX service within a node
+		self.asid = asid 	# asid: appSocket id
 		self.rudpNATSkt = rudpNATSkt
 		self.touchMsgToSnd = oDict()
 		self.keepAliveMsgToSnd = oDict()
 		self.targetMidPeer = None
-		self.stat = pxStat()
+		self.stat = natStat()
 
 	def start(self, midPeerFlag):
-		# Default: start pxService as an ordinary peer
-		# Otherwise: start pxService as a middle peer
 		self.midPeerFlag = midPeerFlag
 		natThread = spawn(self.sendNATMsgLoop)
 		sleep(0)
@@ -51,11 +49,11 @@ class PXService(object):
 	#		if debug: print 'Maintaining NAT holes with {0} buddies'.format(len(self.buddyDict.keys()))
 			curTime = time()
 			timeToWait = KEEP_ALIVE_MSG_INT
-			keepAliveMsg = (PX_CODE_KEEP_ALIVE, None)
+			keepAliveMsg = (NAT_CODE_KEEP_ALIVE, None)
 	#		if debug: print 'keepAliveMsgToSnd: {0}'.format(self.keepAliveMsgToSnd)
 			for addr in self.keepAliveMsgToSnd.keys():
 				if self.keepAliveMsgToSnd[addr][0] < curTime:
-					self.rudpNATSkt.sendPXMsgto(dumps(keepAliveMsg), addr)
+					self.rudpNATSkt.sendNATMsgto(dumps(keepAliveMsg), addr)
 					count = self.keepAliveMsgToSnd[addr][1] + 1
 					self.keepAliveMsgToSnd.pop(addr)
 					self.keepAliveMsgToSnd[addr] = (curTime + KEEP_ALIVE_MSG_INT, count)
@@ -63,11 +61,11 @@ class PXService(object):
 					timeToWait = self.keepAliveMsgToSnd[addr][0] - curTime
 					break
 			
-			touchMsg = (PX_CODE_TOUCH, None)
+			touchMsg = (NAT_CODE_TOUCH, None)
 	#		if debug: print 'touchMsgToSnd: {0}'.format(self.touchMsgToSnd)
 			for addr in self.touchMsgToSnd.keys():
 				if self.touchMsgToSnd[addr][0] < curTime:
-					self.rudpNATSkt.sendPXMsgto(dumps(touchMsg), addr)
+					self.rudpNATSkt.sendNATMsgto(dumps(touchMsg), addr)
 					count = self.touchMsgToSnd[addr][1] + 1
 					self.touchMsgToSnd.pop(addr)
 					if count < 5:	# send out 5 touchMsg to compensate for the unreliability of UDP
@@ -77,44 +75,44 @@ class PXService(object):
 					break
 			sleep(timeToWait)
 
-	def process(self, rawPXMsg, addr):
-		pxMsg = loads(rawPXMsg)
-		if pxMsg[0] == PX_CODE_KEEP_ALIVE:
+	def process(self, rawNATMsg, addr):
+		natMsg = loads(rawNATMsg)
+		if natMsg[0] == NAT_CODE_KEEP_ALIVE:
 	#		if debug: print 'receive KeepAliveMsg from {0}'.format(addr)
 			self.stat.lastKeepAliveMsgRcv[addr] = time()
-		elif self.midPeerFlag and pxMsg[0] == PX_CODE_REQUEST:
-			self.processRequestMsg(pxMsg, addr)
-		elif pxMsg[0] == PX_CODE_REPLY and addr == self.targetMidPeer:
-			self.processReplyMsg(pxMsg, addr)
-		elif pxMsg[0] == PX_CODE_NOTIFY and addr == self.targetMidPeer:
-			self.processNotifyMsg(pxMsg, addr)
-		elif pxMsg[0] == PX_CODE_TOUCH:
-			self.processTouchMsg(pxMsg, addr)
+		elif self.midPeerFlag and natMsg[0] == NAT_CODE_REQUEST:
+			self.processRequestMsg(natMsg, addr)
+		elif natMsg[0] == NAT_CODE_REPLY and addr == self.targetMidPeer:
+			self.processReplyMsg(natMsg, addr)
+		elif natMsg[0] == NAT_CODE_NOTIFY and addr == self.targetMidPeer:
+			self.processNotifyMsg(natMsg, addr)
+		elif natMsg[0] == NAT_CODE_TOUCH:
+			self.processTouchMsg(natMsg, addr)
 	#		if debug: print 'receive TouchMsg from {0}'.format(addr)
 	
-	def processRequestMsg(self, pxMsg, addr):
+	def processRequestMsg(self, natMsg, addr):
 		self.reply(addr)
 		self.notify(self.buddyDict.keys(), addr)	# only notify once?
 		self.buddyDict[addr] = True
 		self.keepAliveMsgToSnd[addr] = (time() + TOUCH_MSG_INT, 0)
 
-	def processReplyMsg(self, pxMsg, addr):
+	def processReplyMsg(self, natMsg, addr):
 		self.buddyDict[addr] = True
 		self.keepAliveMsgToSnd[addr] = (time() + KEEP_ALIVE_MSG_INT, 0)
-		if debug: print pxMsg[1]
-		for rawAddr in pxMsg[1]:
+		if debug: print natMsg[1]
+		for rawAddr in natMsg[1]:
 			buddyAddr = (rawAddr[0].encode(), rawAddr[1])
 			#self.touch(buddyAddr)
 			self.buddyDict[buddyAddr] = False	# not verified
 			self.touchMsgToSnd[buddyAddr] = (time() + TOUCH_MSG_INT, 0)
 	
-	def processNotifyMsg(self, pxMsg, addr):
-		newPeerAddr = (pxMsg[1][0].encode(), pxMsg[1][1])
+	def processNotifyMsg(self, natMsg, addr):
+		newPeerAddr = (natMsg[1][0].encode(), natMsg[1][1])
 	#	if debug: print '[Old Peer]: new peer {0} arrives'.format(newPeerAddr)
 		self.buddyDict[newPeerAddr] = False
 		self.touchMsgToSnd[newPeerAddr] = (time() + TOUCH_MSG_INT, 0)
 
-	def processTouchMsg(self, pxMsg, addr):
+	def processTouchMsg(self, natMsg, addr):
 		try:
 			#self.touchMsgToSnd.pop(addr)
 			self.buddyDict[addr] = True	# buddy is verified, start sending KeepAliveMsg
@@ -123,41 +121,39 @@ class PXService(object):
 
 	def request(self, midPeerAddr, buddyID = None):
 		self.targetMidPeer = midPeerAddr
-		msg = (PX_CODE_REQUEST, buddyID)
-		self.rudpNATSkt.sendPXMsgto(dumps(msg), midPeerAddr)
+		msg = (NAT_CODE_REQUEST, buddyID)
+		self.rudpNATSkt.sendNATMsgto(dumps(msg), midPeerAddr)
 	#	if debug: print '[New Peer]: connecting to the middle peer {0}'.format(midPeerAddr)
 
 	def reply(self, newPeerAddr):
-		msg = (PX_CODE_REPLY, self.buddyDict.keys())
-		self.rudpNATSkt.sendPXMsgto(dumps(msg), newPeerAddr)
+		msg = (NAT_CODE_REPLY, self.buddyDict.keys())
+		self.rudpNATSkt.sendNATMsgto(dumps(msg), newPeerAddr)
 
 	def notify(self, buddyAddrList, newPeerAddr):
-		msg = (PX_CODE_NOTIFY, newPeerAddr)
+		msg = (NAT_CODE_NOTIFY, newPeerAddr)
 		for buddyAddr in buddyAddrList:
-			self.rudpNATSkt.sendPXMsgto(dumps(msg), buddyAddr)
+			self.rudpNATSkt.sendNATMsgto(dumps(msg), buddyAddr)
 
 
 class rudpNATSocket(rudpSocket):
 	def __init__(self, srcPort):
 		super(rudpNATSocket, self).__init__(srcPort)
-		# a peer may be involved in many PXServices as diff. roles
-		self.pxServiceDict = dict()	
+		self.natServiceDict = dict()	
 
-	def getPXService(self, id = 0):
-		# only one PXService is allowed
-		if self.pxServiceDict.get(id) == None:
-			self.pxServiceDict[id] = PXService(self, id)
-		return self.pxServiceDict[id]
+	def getNATService(self, asid = 0):
+		if self.natServiceDict.get(asid) == None:
+			self.natServiceDict[asid] = natService(self, asid)
+		return self.natServiceDict[asid]
 
-	def delPXService(self, id = 0):
-		self.pxServiceDict.pop(id)
+	def delNATService(self, asid = 0):
+		self.natServiceDict.pop(asid)
 
-	def startPXService(self, midPeerFlag = False, id = 0):
-		self.pxServiceDict[id].start(midPeerFlag)
+	def startNATService(self, midPeerFlag = False, asid = 0):
+		self.natServiceDict[asid].start(midPeerFlag)
 
-	def getBuddies(self, id = 0):
-		if self.pxServiceDict[id] == None: print 'No PX service is started'
-		else: return self.pxServiceDict[id].buddyDict.keys()
+	def getBuddies(self, asid = 0):
+		if self.natServiceDict[asid] == None: print 'No NAT service is started'
+		else: return self.natServiceDict[asid].buddyDict.keys()
 
 	def recvLoop(self):
 		while True:
@@ -180,28 +176,28 @@ class rudpNATSocket(rudpSocket):
 			self.keepAliveMsgToSnd[addr] = (curTime + KEEP_ALIVE_MSG_INT, count)
 
 	def proNAT(self, recvPkt, addr):
-		self.pxServiceDict[recvPkt['id']].process(recvPkt['data'], addr)
+		self.natServiceDict[recvPkt['id']].process(recvPkt['data'], addr)
 
-	def sendPXMsgto(self, pxMsg, destAddr, pxID = 0):
-		self.skt.sendto( encode(rudpPacket(NAT, pxID, False, pxMsg)), destAddr)
+	def sendNATMsgto(self, natMsg, destAddr, asid = 0):
+		self.skt.sendto( encode(rudpPacket(NAT, asid, False, natMsg)), destAddr)
 
-def pbar(window, px):
+def pbar(window, nat):
 	while True:
-		if px.midPeerFlag: window.addstr(2, 5, 'Peer Role: Middle Peer/Sender')
+		if nat.midPeerFlag: window.addstr(2, 5, 'Peer Role: Middle Peer/Sender')
 		else: window.addstr(2, 5, 'Peer Role: Ordinary Peer/Receiver')
-		buddyList = px.buddyDict.keys()
+		buddyList = nat.buddyDict.keys()
 		window.addstr(5, 5, 'Buddy Count: {0}'.format(len(buddyList)))
 		for i in range(min( 5, len(buddyList))):
-			window.addstr( 6 + 3*i, 5, 'Buddy [{0}]: {1}, Status: {2}'.format( i, buddyList[i], px.buddyDict[buddyList[i]]))
-			nextKeepAliveMsgToSnd = px.keepAliveMsgToSnd.get(buddyList[i])
+			window.addstr( 6 + 3*i, 5, 'Buddy [{0}]: {1}, Status: {2}'.format( i, buddyList[i], nat.buddyDict[buddyList[i]]))
+			nextKeepAliveMsgToSnd = nat.keepAliveMsgToSnd.get(buddyList[i])
 			if nextKeepAliveMsgToSnd:
 				window.addstr( 7 + 3*i, 5, '      Next KeepAliveMsg Snd: {0}'.format(nextKeepAliveMsgToSnd))
-				window.addstr( 8 + 3*i, 5, '      Last KeepAliveMsg Rcv: {0}'.format(px.stat.lastKeepAliveMsgRcv.get(buddyList[i])))
+				window.addstr( 8 + 3*i, 5, '      Last KeepAliveMsg Rcv: {0}'.format(nat.stat.lastKeepAliveMsgRcv.get(buddyList[i])))
 		if len(buddyList) >= 6:
 			window.addstr( 17, 5, '...')
 			window.addstr( 18, 5, '(top 10 entries are shown)')
-		window.addstr( 19, 5, 'KeepAliveMsgToSnd: {0} entries'.format(len(px.keepAliveMsgToSnd.keys())))
-		window.addstr( 20,5, 'TouchMsgToSnd: {0} entries'.format(len(px.touchMsgToSnd.keys())))
+		window.addstr( 19, 5, 'KeepAliveMsgToSnd: {0} entries'.format(len(nat.keepAliveMsgToSnd.keys())))
+		window.addstr( 20,5, 'TouchMsgToSnd: {0} entries'.format(len(nat.touchMsgToSnd.keys())))
 		window.border()
 		window.refresh()
 		sleep(0.5) 
@@ -209,16 +205,16 @@ def pbar(window, px):
 
 if __name__ == "__main__":
 	m = rudpNATSocket(int(argv[1]))
-	m.getPXService()
+	m.getNATService()
 	if argv[2] == 'True':
-		m.startPXService(True)
+		m.startNATService(True)
 	else:
-		m.startPXService(False)
+		m.startNATService(False)
 
 	if argv[2] == 'False':
-		m.getPXService().request(mid)
+		m.getNATService().request(mid)
 
-	curses.wrapper(pbar, m.getPXService())
+	curses.wrapper(pbar, m.getNATService())
 
 
 
