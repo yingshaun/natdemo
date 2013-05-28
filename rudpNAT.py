@@ -121,7 +121,7 @@ class natService(object):
 
 	def processTouchMsg(self, natMsg, addr):
 #		try:
-		self.touchMsgToSnd.pop(addr)
+		#self.touchMsgToSnd.pop(addr)
 		self.buddyDict[addr] = True	# buddy is verified, start sending KeepAliveMsg
 		self.keepAliveMsgToSnd[addr] = (time() + KEEP_ALIVE_MSG_INT, 0)
 #		except KeyError: print 'Error'
