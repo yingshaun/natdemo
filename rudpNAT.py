@@ -120,11 +120,11 @@ class natService(object):
 		self.touchMsgToSnd[newPeerAddr] = (time() + TOUCH_MSG_INT, 0)
 
 	def processTouchMsg(self, natMsg, addr):
-		try:
-			#self.touchMsgToSnd.pop(addr)
-			self.buddyDict[addr] = True	# buddy is verified, start sending KeepAliveMsg
-			self.keepAliveMsgToSnd[addr] = (time() + KEEP_ALIVE_MSG_INT, 0)
-		except KeyError: pass
+#		try:
+		self.touchMsgToSnd.pop(addr)
+		self.buddyDict[addr] = True	# buddy is verified, start sending KeepAliveMsg
+		self.keepAliveMsgToSnd[addr] = (time() + KEEP_ALIVE_MSG_INT, 0)
+#		except KeyError: print 'Error'
 
 	def request(self, midPeerAddr, buddyID = None):
 		self.targetMidPeer = midPeerAddr
