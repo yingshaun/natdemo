@@ -35,8 +35,10 @@ class natService(object):
 		self.targetMidPeer = None
 		self.stat = natStat()
 		ip = IP.Instance()
-		self.myip = ip.myip
-		self.myip2 = ip.myip2
+		try: self.myip = ip.myip
+		except Exception: self.myip = ''
+		try: self.myip2 = ip.myip2
+		except Exception: self.myip2 = ''
 		self.port = rudpNATSkt.skt.getsockname()[1]
 
 	def start(self, midPeerFlag):

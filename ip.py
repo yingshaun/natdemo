@@ -57,5 +57,8 @@ class IP(object):
 		return ''
 
 	def getPrivateIP(self):
-		try: return [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0]
-		except KeyError: return ''
+		try: 
+			privateIP = [ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1][0]
+			return privateIP
+		except IndexError: 
+			return ''
