@@ -75,7 +75,7 @@ class natService(object):
 					self.rudpNATSkt.sendNATMsgto(dumps(touchMsg), addr)
 					count = self.touchMsgToSnd[addr][1] + 1
 					self.touchMsgToSnd.pop(addr)
-					if count < 3:	# send out 5 touchMsg to compensate for the unreliability of UDP
+					if count < 5:	# send out 5 touchMsg to compensate for the unreliability of UDP
 						self.touchMsgToSnd[addr] = (curTime + TOUCH_MSG_INT, count)
 				else:
 					timeToWait = self.touchMsgToSnd[addr][0] - curTime
